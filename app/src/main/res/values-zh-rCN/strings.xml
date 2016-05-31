@@ -6,6 +6,11 @@
     <string name="action_search">搜索</string>
     <string name="action_next_page">加载下一页</string>
 
+    <!-- Initial -->
+    <string name="dialog_permission_title">权限需要</string>
+    <string name="dialog_permission_msg">NH 本子需要读写储存权限以缓存图片。缺少权限可能会导致本应用无法正常工作。</string>
+    <string name="snack_permission_failed">权限请求被拒绝了QAQ</string>
+
     <!-- New Home Design -->
     <string name="search_bar_hint">在这里搜索本子....</string>
     <string name="title_bar_main_recent">最新本子</string>
@@ -19,7 +24,9 @@
     <string name="item_favorite_categories">已收藏的分类</string>
     <string name="item_tag">标签</string>
     <string name="item_character">人物</string>
+	<string name="item_group_other">其它</string>
     <string name="item_open_nhentai">打开 NHentai 网站</string>
+	<string name="item_settings">设置</string>
 
     <string name="title_page_latest">最新</string>
     <string name="title_page_download">已保存的本子</string>
@@ -88,6 +95,12 @@
     <string name="tips_no_more_results">这里已经是最后一页了。</string>
     <string name="action_clear">清除文字</string>
 
+    <!-- Category -->
+    <string-array name="category_tabs_title">
+        <item>最新</item>
+        <item>热门</item>
+    </string-array>
+
     <string name="settings_main">设置</string>
     <string name="snackbar_need_restart">你需要重新启动应用来应用更改。</string>
     <string name="snackbar_need_restart_action">现在重启</string>
@@ -99,6 +112,8 @@
     <string name="set_title_google_plus_summary">+Fung Jichun</string>
     <string name="set_title_github">Github 开源项目</string>
     <string name="set_title_github_website">"https://github.com/fython/NHentai-android"</string>
+    <string name="set_title_gpgroup">Google+ 讨论社群</string>
+    <string name="set_title_gpgroup_link">"https://plus.google.com/communities/106652485673516183999"</string>
     <string name="set_title_telegram">Telegram 讨论组</string>
     <string name="set_title_telegram_link">"https://telegram.me/joinchat/0668165200bd194d0a89b8995057e330"</string>
     <string name="set_title_alipay">捐赠支持(支付宝)</string>
@@ -120,5 +135,14 @@
     <string name="category_details">信息页面</string>
     <string name="set_title_full_image_in_details">加载全高清图片作预览图</string>
     <string name="set_title_full_image_in_details_summary">这样会消耗大量流量和内存（壕任性选项）</string>
+	<string name="settings_storage">存储</string>
+	<string name="category_folder">文件夹</string>
+	<string name="set_title_nomedia">在系统图库中隐藏已保存的本子</string>
+	<string name="set_title_nomedia_summary">通过在目录生成 \".nomedia\" 保护你的秘密</string>
+
+	<!-- Donate -->
+	<string name="dialog_donate_title">捐助我们</string>
+	<string name="dialog_donate_message">一个好的应用需要时间、精力和你们的支持。
+		如果你非常喜欢 NH 本子并且乐意捐助我们，请发送到支付宝：316643843\@qq.com</string>
 
 </resources>

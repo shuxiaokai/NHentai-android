@@ -6,7 +6,12 @@
     <string name="action_search">Search</string>
     <string name="action_next_page">Load next page</string>
 
-    <!-- New Home Design -->
+	<!-- Initial -->
+	<string name="dialog_permission_title">Permission is needed</string>
+	<string name="dialog_permission_msg">NHBooks needs the permission of reading and writing external storage to cache images. Without them, this app could not work well.</string>
+	<string name="snack_permission_failed">The request of permissions is denied!</string>
+
+	<!-- New Home Design -->
     <string name="search_bar_hint">Search books here....</string>
 	<string name="title_bar_main_recent">Latest books</string>
 	<string name="title_bar_updated_time_just_now">Updated just now</string>
@@ -19,6 +24,8 @@
     <string name="item_favorite_categories">Favorite categories</string>
     <string name="item_tag">Tags</string>
     <string name="item_character">Characters</string>
+	<string name="item_group_other">Other</string>
+	<string name="item_settings">Settings</string>
 	<string name="item_open_nhentai">Open NHentai.net</string>
 
     <string name="title_page_latest">Latest</string>
@@ -88,6 +95,12 @@
     <string name="tips_no_result">No result.</string>
     <string name="tips_no_more_results">There is the last page.</string>
 
+	<!-- Category -->
+	<string-array name="category_tabs_title">
+		<item>Latest</item>
+		<item>Popular</item>
+	</string-array>
+
     <string name="settings_main">Settings</string>
 	<string name="snackbar_need_restart">You need to restart app to apply settings.</string>
 	<string name="snackbar_need_restart_action">Restart now</string>
@@ -99,6 +112,8 @@
     <string name="set_title_google_plus_summary">+Fung Jichun</string>
     <string name="set_title_github">Github Repo</string>
     <string name="set_title_github_website">"https://github.com/fython/NHentai-android"</string>
+	<string name="set_title_gpgroup">Google+ Group</string>
+	<string name="set_title_gpgroup_link">"https://plus.google.com/communities/106652485673516183999"</string>
     <string name="set_title_telegram">Telegram Group</string>
     <string name="set_title_telegram_link">"https://telegram.me/joinchat/0668165200bd194d0a89b8995057e330"</string>
 	<string name="set_title_alipay">Donate us by Alipay</string>
@@ -120,5 +135,14 @@
 	<string name="category_details">Info page</string>
 	<string name="set_title_full_image_in_details">Load Full HD images as preview</string>
 	<string name="set_title_full_image_in_details_summary">It will consume plenty of data usage and memory.</string>
+	<string name="settings_storage">Storage</string>
+	<string name="category_folder">Folder</string>
+	<string name="set_title_nomedia">Do not show saved books in gallery</string>
+	<string name="set_title_nomedia_summary">Protect your secret gardens by creating \".nomedia\" in directory</string>
+
+	<!-- Donate -->
+	<string name="dialog_donate_title">Donate us</string>
+	<string name="dialog_donate_message">A nice application needs time, energy and your support.
+		If you love NHBooks very much and you\'re willing to donate us, please send your support to here (Alipay):316643843\@qq.com</string>
 
 </resources>

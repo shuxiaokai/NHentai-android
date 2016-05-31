@@ -2,6 +2,8 @@ package moe.feng.nhentai.ui;
 
 import android.animation.Animator;
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.ActivityOptions;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.ProgressDialog;
@@ -31,6 +33,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.nvanbenschoten.motion.ParallaxImageView;
 import com.squareup.picasso.Picasso;
 
 import java.io.File;
@@ -53,7 +56,7 @@ import moe.feng.nhentai.util.ColorGenerator;
 import moe.feng.nhentai.util.Settings;
 import moe.feng.nhentai.util.TextDrawable;
 import moe.feng.nhentai.util.Utility;
-import moe.feng.nhentai.util.task.PageDownloader;
+import moe.feng.nhentai.util.task.BookDownloader;
 import moe.feng.nhentai.view.AutoWrapLayout;
 import moe.feng.nhentai.view.ObservableScrollView;
 import moe.feng.nhentai.view.WheelProgressView;
@@ -62,7 +65,8 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 
 	private ObservableScrollView mScrollView;
 	private FrameLayout mAppBarContainer, mImageContainer;
-	private ImageView mImageView, mImagePlaceholderView;
+	private ImageView mImagePlaceholderView;
+	private ParallaxImageView mImageView;
 	private FloatingActionButton mFAB;
 	private TextView mTitleText;
 	private LinearLayout mTagsLayout;
@@ -91,7 +95,7 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 	private AlertDialog mDialogDel, mDialogDownload, mDialogDelOrDownload;
 	private ProgressDialog mDialogDownloading;
 
-	private PageDownloader mDownloader;
+	private BookDownloader mDownloader;
 	private FileCacheManager mFileCacheManager;
 
 	@Override
@@ -127,11 +131,25 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 		setContentView(R.layout.activity_book_details);
 
 		getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-
+		getSupportActionBar().setDisplayShowTitleEnabled(false);
+		ActivityOptions.makeTaskLaunchBehind();
 		FileCacheManager cm = FileCacheManager.getInstance(getApplicationContext());
 
-		int color = ColorGenerator.MATERIAL.getColor(book.title);
-		TextDrawable textDrawable = TextDrawable.builder().buildRect(Utility.getFirstCharacter(book.title), color);
+		TextDrawable textDrawable;
+		if (book.title != null) {
+			int color = ColorGenerator.MATERIAL.getColor(book.title);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+				ActivityManager.TaskDescription taskDesc = new ActivityManager.TaskDescription(
+						TextUtils.isEmpty(book.titleJP) ? book.title : book.titleJP,
+						null,
+						getResources().getColor(R.color.deep_purple_300)
+				);
+				setTaskDescription(taskDesc);
+			}
+			textDrawable = TextDrawable.builder().buildRect(Utility.getFirstCharacter(book.title), color);
+		} else {
+			textDrawable = TextDrawable.builder().buildRect("", getResources().getColor(R.color.deep_purple_500));
+		}
 		mImagePlaceholderView.setImageDrawable(textDrawable);
 
 		if (book.galleryId != null) {
@@ -221,6 +239,18 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 	}
 
 	@Override
+	public void onResume() {
+		super.onResume();
+		mImageView.registerSensorManager(10);
+	}
+
+	@Override
+	public void onPause() {
+		super.onPause();
+		mImageView.unregisterSensorManager();
+	}
+
+	@Override
 	public void onScrollChanged(ObservableScrollView view, int x, int y, int oldx, int oldy) {
 		setViewsTranslation(Math.min(minHeight, y));
 	}
@@ -243,16 +273,26 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 
 	public static void launch(Activity activity, ImageView imageView, Book book, int fromPosition) {
 		Intent intent = new Intent(activity, BookDetailsActivity.class);
-		intent.setFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+		} else {
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		}
 		intent.putExtra(EXTRA_BOOK_DATA, book.toJSONString());
 		intent.putExtra(EXTRA_POSITION, fromPosition);
-		activity.startActivityForResult(intent, REQUEST_MAIN);
+		activity.startActivity(intent);
 	}
 
 	private void updateUIContent() {
 		$(R.id.toolbar).invalidate();
 
 		mFAB.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View view) {
+				GalleryActivity.launch(BookDetailsActivity.this, book, 0);
+			}
+		});
+		$(R.id.appbar_container).setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View view) {
 				GalleryActivity.launch(BookDetailsActivity.this, book, 0);
@@ -267,6 +307,14 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 		mContentView.setVisibility(View.VISIBLE);
 		mContentView.animate().alphaBy(0f).alpha(1f).setDuration(1500).start();
 		mTitleText.setText(TextUtils.isEmpty(book.titleJP) ? book.title : book.titleJP);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			ActivityManager.TaskDescription taskDesc = new ActivityManager.TaskDescription(
+					TextUtils.isEmpty(book.titleJP) ? book.title : book.titleJP,
+					null,
+					getResources().getColor(R.color.deep_purple_300)
+			);
+			setTaskDescription(taskDesc);
+		}
 		if (isFromExternal) {
 			new CoverTask().execute(book);
 		}
@@ -728,9 +776,9 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 	private void startDownload(int progress) {
 		progress = Math.max(0, progress);
 		if (mDownloader == null) {
-			mDownloader = new PageDownloader(getApplicationContext(), book);
+			mDownloader = new BookDownloader(getApplicationContext(), book);
 			mDownloader.setCurrentPosition(0);
-			mDownloader.setOnDownloadListener(new PageDownloader.OnDownloadListener() {
+			mDownloader.setOnDownloadListener(new BookDownloader.OnDownloadListener() {
 				@Override
 				public void onFinish(int position, final int progress) {
 					if (mDialogDownloading == null) return;
@@ -758,7 +806,7 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 				@Override
 				public void onStateChange(int state, final int progress) {
 					switch (state) {
-						case PageDownloader.STATE_STOP:
+						case BookDownloader.STATE_STOP:
 							if (mDialogDownloading == null) return;
 							runOnUiThread(new Runnable() {
 								@Override
@@ -767,7 +815,7 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 								}
 							});
 							break;
-						case PageDownloader.STATE_PAUSE:
+						case BookDownloader.STATE_PAUSE:
 							if (mDialogDownloading == null) return;
 							runOnUiThread(new Runnable() {
 								@Override
@@ -783,8 +831,42 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 								}
 							});
 							break;
-						case PageDownloader.STATE_ALL_OK:
-							startCopyToExternal();
+						case BookDownloader.STATE_ALL_OK:
+							runOnUiThread(new Runnable() {
+								@Override
+								public void run() {
+									isDownloaded = true;
+									invalidateOptionsMenu();
+
+									NotificationManagerCompat nm = NotificationManagerCompat.from(getApplicationContext());
+
+									Intent intent = new Intent(getApplicationContext(), BookDetailsActivity.class);
+									intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+									intent.putExtra(EXTRA_BOOK_DATA, book.toJSONString());
+
+									Notification n = new NotificationCompat.Builder(BookDetailsActivity.this)
+											.setContentTitle(getString(R.string.dialog_download_notification_title))
+											.setTicker(getString(R.string.dialog_download_notification_title))
+											.setSubText(book.getAvailableTitle())
+											.setContentIntent(
+													PendingIntent.getActivity(
+															getApplicationContext(),
+															0,
+															intent,
+															PendingIntent.FLAG_CANCEL_CURRENT
+													)
+											)
+											.setAutoCancel(true)
+											.setSmallIcon(R.drawable.ic_file_download_white_24dp)
+											.setPriority(Notification.PRIORITY_MAX)
+											.build();
+
+									nm.notify(NOTIFICATION_ID_FINISH, n);
+
+									if (mDialogDownloading == null) return;
+									mDialogDownloading.dismiss();
+								}
+							});
 							break;
 					}
 				}
@@ -839,61 +921,6 @@ public class BookDetailsActivity extends AbsActivity implements ObservableScroll
 		mDialogDownloading.show();
 		mFileCacheManager.saveBookDataToExternalPath(book);
 		mDownloader.start();
-	}
-
-	private void startCopyToExternal() {
-		runOnUiThread(
-			new Runnable() {
-				@Override
-				public void run() {
-					mDialogDownloading.setMessage(getString(R.string.dialog_download_copying));
-				}
-			}
-		);
-		new Thread() {
-			@Override
-			public void run() {
-				for (int i = 0; i < book.pageCount; i++) {
-					mDialogDownloading.setIndeterminate(true);
-					mFileCacheManager.saveToExternalPath(book, i + 1);
-				}
-				runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						isDownloaded = true;
-						invalidateOptionsMenu();
-
-						NotificationManagerCompat nm = NotificationManagerCompat.from(getApplicationContext());
-
-						Intent intent = new Intent(getApplicationContext(), BookDetailsActivity.class);
-						intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-						intent.putExtra(EXTRA_BOOK_DATA, book.toJSONString());
-
-						Notification n = new NotificationCompat.Builder(BookDetailsActivity.this)
-								.setContentTitle(getString(R.string.dialog_download_notification_title))
-								.setTicker(getString(R.string.dialog_download_notification_title))
-								.setContentText(book.getAvailableTitle())
-								.setContentIntent(
-										PendingIntent.getActivity(
-												getApplicationContext(),
-												0,
-												intent,
-												PendingIntent.FLAG_CANCEL_CURRENT
-										)
-								)
-								.setAutoCancel(true)
-								.setSmallIcon(R.drawable.ic_file_download_white_24dp)
-								.setPriority(Notification.PRIORITY_MAX)
-								.build();
-
-						nm.notify(NOTIFICATION_ID_FINISH, n);
-
-						if (mDialogDownloading == null) return;
-						mDialogDownloading.dismiss();
-					}
-				});
-			}
-		}.start();
 	}
 
 	private void showFAB() {

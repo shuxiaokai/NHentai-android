@@ -1,11 +1,15 @@
 package moe.feng.nhentai.ui;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,11 +17,14 @@ import android.support.annotation.DimenRes;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.ActionBarDrawerToggle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.AppCompatTextView;
 import android.support.v7.widget.CardView;
@@ -59,6 +66,8 @@ import moe.feng.nhentai.ui.fragment.main.DownloadManagerFragment;
 import moe.feng.nhentai.ui.fragment.main.FavoriteCategoryFragment;
 import moe.feng.nhentai.ui.fragment.main.FavoriteFragment;
 import moe.feng.nhentai.util.AsyncTask;
+import moe.feng.nhentai.util.CrashHandler;
+import moe.feng.nhentai.util.FilesUtil;
 import moe.feng.nhentai.util.Settings;
 import moe.feng.nhentai.util.Utility;
 
@@ -123,9 +132,13 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 
 	public static final String TAG = HomeActivity.class.getSimpleName();
 
+	private static final int REQUEST_CODE_PERMISSION_GET = 101;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		mSets = Settings.getInstance(getApplicationContext());
+		CrashHandler.init(getApplicationContext());
+		CrashHandler.register();
 
 		/** Set up translucent status bar */
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -148,8 +161,9 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 
 		getWindow().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.background_material_light)));
 
-		if (mListKeeper.getData() != null && mListKeeper.getUpdatedMiles() != -1) {
+		if (mListKeeper.getData() != null && !mListKeeper.getData().isEmpty() && mListKeeper.getUpdatedMiles() != -1) {
 			mBooks = mListKeeper.getData();
+			mNowPage = mListKeeper.getNowPage();
 			mAdapter = new BookListRecyclerAdapter(mRecyclerView, mBooks, mFM, mSets);
 			setRecyclerAdapter(mAdapter);
 			isFirstLoad = false;
@@ -159,6 +173,38 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 			setRecyclerAdapter(mAdapter);
 			new PageGetTask().execute(mNowPage);
 		}
+
+		if (PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+			if (mSets.getBoolean(Settings.KEY_NO_MEDIA, true)) {
+				FilesUtil.createNewFile(FilesUtil.NOMEDIA_FILE);
+			}
+			onLoadMain();
+		} else {
+			new AlertDialog.Builder(this)
+					.setTitle(R.string.dialog_permission_title)
+					.setMessage(R.string.dialog_permission_msg)
+					.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialogInterface, int i) {
+							ActivityCompat.requestPermissions(HomeActivity.this,
+									new String[]{
+											Manifest.permission.WRITE_EXTERNAL_STORAGE,
+											Manifest.permission.READ_EXTERNAL_STORAGE
+									},
+									REQUEST_CODE_PERMISSION_GET);
+						}
+					})
+					.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialogInterface, int i) {
+							onLoadMain();
+						}
+					})
+			.show();
+		}
+	}
+
+	private void onLoadMain() {
 		mHandler.postDelayed(new Runnable() {
 			@Override
 			public void run() {
@@ -247,6 +293,16 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 					@Override
 					public void run() {
 						finishLaunchAnimation = true;
+						if (mSets.getInt(Settings.KEY_CELEBRATE, -1) != 2) {
+							Snackbar.make(
+									mDrawerLayout, R.string.celebrate_2016, Snackbar.LENGTH_INDEFINITE
+							).setAction(R.string.snack_action_get_it, new View.OnClickListener() {
+								@Override
+								public void onClick(View view) {
+									mSets.putInt(Settings.KEY_CELEBRATE, 2);
+								}
+							}).show();
+						}
 					}
 				}, 200);
 			}
@@ -284,16 +340,54 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 		}
 
 		int id = item.getItemId();
-		if (id == R.id.action_settings) {
-			SettingsActivity.launchActivity(this, SettingsActivity.FLAG_MAIN);
-			return true;
-		} else if (id == R.id.action_load_next_page) {
+		if (id == R.id.action_load_next_page) {
 			mSwipeRefreshLayout.setRefreshing(true);
 			new PageGetTask().execute(++mNowPage);
 			return true;
 		}
 
 		return super.onOptionsItemSelected(item);
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+		if (requestCode == REQUEST_CODE_PERMISSION_GET) {
+			if (grantResults.length > 0) {
+				boolean b = true;
+				for (int i : grantResults) {
+					if (i == PackageManager.PERMISSION_DENIED) {
+						showPermissionDeniedSnackbar();
+						b = false;
+						break;
+					}
+				}
+				if (b && mSets.getBoolean(Settings.KEY_NO_MEDIA, true)) {
+					FilesUtil.createNewFile(FilesUtil.NOMEDIA_FILE);
+				}
+			} else {
+				showPermissionDeniedSnackbar();
+			}
+			onLoadMain();
+		}
+	}
+
+	private void showPermissionDeniedSnackbar() {
+		Snackbar.make(
+				mRecyclerView,
+				R.string.snack_permission_failed,
+				Snackbar.LENGTH_INDEFINITE)
+				.setAction(R.string.snack_action_try_again, new View.OnClickListener() {
+					@Override
+					public void onClick(View view) {
+						ActivityCompat.requestPermissions(HomeActivity.this,
+								new String[]{
+										Manifest.permission.WRITE_EXTERNAL_STORAGE,
+										Manifest.permission.READ_EXTERNAL_STORAGE
+								},
+								REQUEST_CODE_PERMISSION_GET);
+					}
+				})
+				.show();
 	}
 
 	private void initViews() {
@@ -608,6 +702,25 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 					}
 				});
 				return true;
+			case R.id.navigation_item_settings:
+				SettingsActivity.launchActivity(this, SettingsActivity.FLAG_MAIN);
+				return true;
+			case R.id.navigation_item_donate:
+				new AlertDialog.Builder(this)
+						.setTitle(R.string.dialog_donate_title)
+						.setMessage(R.string.dialog_donate_message)
+						.setNegativeButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface dialogInterface, int i) {
+
+							}
+						})
+						.show();
+				return true;
+			case R.id.navigation_item_open_nhentai:
+				Uri uri = Uri.parse("http://nhentai.net");
+				startActivity(new Intent(Intent.ACTION_VIEW, uri));
+				return true;
 		}
 
 		return false;
@@ -682,6 +795,7 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 
 						mListKeeper.setData(mBooks);
 						mListKeeper.setUpdatedMiles(System.currentTimeMillis());
+						mListKeeper.setNowPage(mNowPage);
 						new Thread() {
 							@Override
 							public void run() {
@@ -704,6 +818,7 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
 				} else if (mNowPage == 1) {
 					mListKeeper.setData(new ArrayList<Book>());
 					mListKeeper.setUpdatedMiles(-1);
+					mListKeeper.setNowPage(1);
 					Snackbar.make(
 							mRecyclerView,
 							R.string.tips_network_error,
